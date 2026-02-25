@@ -25,19 +25,27 @@ jobs:
           for TAG in asa asa-latest asa-owl; do
             echo "Nettoyage du tag : $TAG"
             
-            # 1. Créer un Dockerfile qui passe en root temporairement
+            # 1. Creer un Dockerfile qui passe en root temporairement
             cat <<EOF > Dockerfile
-            FROM ghcr.io/gameservershub-llc/nonfree:$TAG
-            
-            # Passer en administrateur pour contourner l'erreur de permission
-            USER root
-            
-            # Nettoyer les fichiers de démarrage s'ils existent (le "|| true" empêche l'erreur si le fichier n'est pas là)
-            RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /entrypoint.sh 2>/dev/null || true
-            RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /start.sh 2>/dev/null || true
-            
-            # Repasser sur l'utilisateur par défaut de Pterodactyl pour la sécurité
-            USER container
+          FROM ghcr.io/gameservershub-llc/nonfree:$TAG
+          
+          # Passer en administrateur pour contourner l'erreur de permission
+          USER root
+          
+          # Nettoyer le texte normal
+          RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /entrypoint.sh 2>/dev/null || true
+          RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /start.sh 2>/dev/null || true
+          
+          # Nettoyer le logo geant GSH
+          RUN sed -i '/GGGGG/d; /SSSSS/d; /HHHHH/d; /G::::/d; /S::::/d; /H::::/d' /entrypoint.sh 2>/dev/null || true
+          RUN sed -i '/GGGGG/d; /SSSSS/d; /HHHHH/d; /G::::/d; /S::::/d; /H::::/d' /start.sh 2>/dev/null || true
+          
+          # Nettoyer le dessin du hibou MrOwlSky et les bordures
+          RUN sed -i '/~~~/d; /▄/d; /▀/d; /▐/d; /___/d' /entrypoint.sh 2>/dev/null || true
+          RUN sed -i '/~~~/d; /▄/d; /▀/d; /▐/d; /___/d' /start.sh 2>/dev/null || true
+          
+          # Repasser sur l'utilisateur par defaut de Pterodactyl pour la securite
+          USER container
           EOF
 
             # 2. Construire et pousser l'image
