@@ -1,0 +1,44 @@
+name: Sync ASA Images to CroustyCloud
+
+on:
+  schedule:
+    # S'exécute tous les jours à 04:00 du matin
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    # Permet de lancer la synchronisation manuellement depuis l'onglet Actions
+
+jobs:
+  sync-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync ASA Owl
+        run: |
+          docker pull ghcr.io/gameservershub-llc/nonfree:asa-owl
+          docker tag ghcr.io/gameservershub-llc/nonfree:asa-owl ghcr.io/${{ github.repository_owner }}/nonfree:asa-owl
+          docker push ghcr.io/${{ github.repository_owner }}/nonfree:asa-owl
+
+      - name: Sync ASA Latest
+        run: |
+          docker pull ghcr.io/gameservershub-llc/nonfree:asa-latest
+          docker tag ghcr.io/gameservershub-llc/nonfree:asa-latest ghcr.io/${{ github.repository_owner }}/nonfree:asa-latest
+          docker push ghcr.io/${{ github.repository_owner }}/nonfree:asa-latest
+
+      - name: Sync ASA
+        run: |
+          docker pull ghcr.io/gameservershub-llc/nonfree:asa
+          docker tag ghcr.io/gameservershub-llc/nonfree:asa ghcr.io/${{ github.repository_owner }}/nonfree:asa
+          docker push ghcr.io/${{ github.repository_owner }}/nonfree:asa
