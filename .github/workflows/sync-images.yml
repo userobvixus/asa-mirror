@@ -23,36 +23,46 @@ jobs:
       - name: Sync and Clean Images
         run: |
           for TAG in asa asa-latest asa-owl; do
-            echo "Nettoyage du tag : $TAG"
+            echo "------------------------------------------------------"
+            echo "Traitement du tag : $TAG"
+            echo "------------------------------------------------------"
             
-            # 1. Récupérer l'image originale
+            # 1. Pull de l'image
             docker pull ghcr.io/gameservershub-llc/nonfree:$TAG
-            
-            # 2. Créer un conteneur temporaire pour extraire le script de démarrage
-            # Sur ces images, le script est généralement à la racine ou dans /
-            docker run --rm --entrypoint cat ghcr.io/gameservershub-llc/nonfree:$TAG /entrypoint.sh > entrypoint.sh || \
-            docker run --rm --entrypoint cat ghcr.io/gameservershub-llc/nonfree:$TAG /start.sh > entrypoint.sh
 
-            # 3. Supprimer uniquement les lignes contenant les mentions indésirables
-            # On ignore la casse (-i) pour attraper "Made By" ou "made by"
-            sed -i '/[Mm]ade [Bb]y/d' entrypoint.sh
-            sed -i '/[Uu]pdated [Bb]y/d' entrypoint.sh
-            sed -i '/[Pp]owered [Bb]y/d' entrypoint.sh
-            sed -i '/[Dd]iscord/d' entrypoint.sh
-            sed -i '/[Gg][Ss][Hh]/d' entrypoint.sh
+            # 2. Tentative d'extraction du script (on teste plusieurs chemins possibles)
+            # On utilise || true pour éviter que le script s'arrête en cas d'erreur ici
+            docker run --rm --entrypoint cat ghcr.io/gameservershub-llc/nonfree:$TAG /entrypoint.sh > entrypoint.sh 2>/dev/null || \
+            docker run --rm --entrypoint cat ghcr.io/gameservershub-llc/nonfree:$TAG /start.sh > entrypoint.sh 2>/dev/null || true
 
-            # 4. Créer un Dockerfile temporaire pour reconstruire l'image avec le script modifié
-            cat <<EOF > Dockerfile
-            FROM ghcr.io/gameservershub-llc/nonfree:$TAG
-            COPY entrypoint.sh /entrypoint.sh
-            COPY entrypoint.sh /start.sh
-            RUN chmod +x /entrypoint.sh /start.sh
-            EOF
+            # 3. Si le fichier existe, on le nettoie
+            if [ -s entrypoint.sh ]; then
+              echo "Nettoyage des mentions GSH/Discord..."
+              sed -i '/[Mm]ade [Bb]y/d' entrypoint.sh
+              sed -i '/[Uu]pdated [Bb]y/d' entrypoint.sh
+              sed -i '/[Pp]owered [Bb]y/d' entrypoint.sh
+              sed -i '/[Dd]iscord/d' entrypoint.sh
+              sed -i '/[Gg][Ss][Hh]/d' entrypoint.sh
+              
+              # Ajout d'une petite touche CroustyCloud (optionnel)
+              echo 'echo -e "\e[35mPropulsé par CroustyCloud\e[0m"' >> entrypoint.sh
 
-            # 5. Build et Push sur ton compte
-            docker build -t ghcr.io/userobvixus/nonfree:$TAG .
+              # 4. Reconstruction de l'image avec le script nettoyé
+              cat <<EOF > Dockerfile
+              FROM ghcr.io/gameservershub-llc/nonfree:$TAG
+              COPY entrypoint.sh /entrypoint.sh
+              COPY entrypoint.sh /start.sh
+              RUN chmod +x /entrypoint.sh /start.sh
+          EOF
+              docker build -t ghcr.io/userobvixus/nonfree:$TAG .
+            else
+              echo "Script de démarrage non trouvé, simple copie de l'image sans nettoyage."
+              docker tag ghcr.io/gameservershub-llc/nonfree:$TAG ghcr.io/userobvixus/nonfree:$TAG
+            fi
+
+            # 5. Push final
             docker push ghcr.io/userobvixus/nonfree:$TAG
             
-            # Nettoyage
-            rm entrypoint.sh Dockerfile
+            # Nettoyage des fichiers temporaires
+            rm -f entrypoint.sh Dockerfile
           done
