@@ -25,35 +25,25 @@ jobs:
           for TAG in asa asa-latest asa-owl; do
             echo "Nettoyage du tag : $TAG"
             
-            # 1. Récupérer l'image source
-            docker pull ghcr.io/gameservershub-llc/nonfree:$TAG
-
-            # 2. Créer un conteneur temporaire pour extraire le script de démarrage dynamiquement
-            # On récupère le chemin du script via l'inspect de Docker
-            SCRIPT_PATH=$(docker inspect --format='{{join .Config.Entrypoint " "}}' ghcr.io/gameservershub-llc/nonfree:$TAG | cut -d' ' -f1)
-            echo "Script détecté : $SCRIPT_PATH"
-
-            if [ -n "$SCRIPT_PATH" ]; then
-              # Extraire le script
-              docker run --rm --entrypoint cat ghcr.io/gameservershub-llc/nonfree:$TAG "$SCRIPT_PATH" > cleaned_script.sh
-              
-              # Nettoyage chirurgical
-              sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' cleaned_script.sh
-              echo 'echo -e "\e[35mPropulsé par CroustyCloud\e[0m"' >> cleaned_script.sh
-
-              # 3. Reconstruire l'image proprement
-              cat <<EOF > Dockerfile
-              FROM ghcr.io/gameservershub-llc/nonfree:$TAG
-              COPY cleaned_script.sh $SCRIPT_PATH
-              RUN chmod +x $SCRIPT_PATH
+            # 1. Créer un Dockerfile qui passe en root temporairement
+            cat <<EOF > Dockerfile
+            FROM ghcr.io/gameservershub-llc/nonfree:$TAG
+            
+            # Passer en administrateur pour contourner l'erreur de permission
+            USER root
+            
+            # Nettoyer les fichiers de démarrage s'ils existent (le "|| true" empêche l'erreur si le fichier n'est pas là)
+            RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /entrypoint.sh 2>/dev/null || true
+            RUN sed -i '/[Mm]ade [Bb]y/d; /[Uu]pdated [Bb]y/d; /[Pp]owered [Bb]y/d; /[Dd]iscord/d; /[Gg][Ss][Hh]/d' /start.sh 2>/dev/null || true
+            
+            # Repasser sur l'utilisateur par défaut de Pterodactyl pour la sécurité
+            USER container
           EOF
-              docker build -t ghcr.io/userobvixus/nonfree:$TAG .
-            else
-              echo "Impossible de trouver le script de démarrage, simple miroir."
-              docker tag ghcr.io/gameservershub-llc/nonfree:$TAG ghcr.io/userobvixus/nonfree:$TAG
-            fi
 
-            # 4. Push
+            # 2. Construire et pousser l'image
+            docker build -t ghcr.io/userobvixus/nonfree:$TAG .
             docker push ghcr.io/userobvixus/nonfree:$TAG
-            rm -f cleaned_script.sh Dockerfile
+            
+            # Nettoyage
+            rm Dockerfile
           done
